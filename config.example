@@ -1,9 +1,9 @@
-# Vorlage für die ChartMogul-Token-Datei.
+# Template for the ChartMogul token file.
 #
-# Echte Datei anlegen (NICHT diese Beispieldatei verwenden):
+# Create the real file (do NOT use this example file):
 #   mkdir -p ~/.config/revenue-stats-bar
-#   printf '%s' 'DEIN_CHARTMOGUL_API_KEY' > ~/.config/revenue-stats-bar/token
+#   printf '%s' 'YOUR_CHARTMOGUL_API_KEY' > ~/.config/revenue-stats-bar/token
 #   chmod 600 ~/.config/revenue-stats-bar/token
 #
-# Den API-Key findest du in ChartMogul unter: Admin -> API Keys.
-# Die Token-Datei enthält ausschließlich den Key in einer Zeile, sonst nichts.
+# Find the API key in ChartMogul under: Admin -> API Keys.
+# The token file contains only the key on a single line, nothing else.

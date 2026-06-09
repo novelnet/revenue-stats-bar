@@ -1,65 +1,64 @@
 # revenue-stats-bar
 
-Zeigt deine wichtigsten **ChartMogul-Kennzahlen** in der macOS-Menüleiste über
+Shows your key **ChartMogul metrics** in the macOS menu bar via
 [SwiftBar](https://github.com/swiftbar/SwiftBar).
 
-Die Menüleisten-Zahl **rotiert** bei jedem Refresh durch die Kennzahlen
-(MRR → ARR → Subscribers → ARPA → LTV → Ø Kundenlebensdauer → Netto-Movement diesen
-Monat), mit ▲/▼-Trend (30 Tage). Das Aufklapp-Menü zeigt immer **alles**:
+The menu-bar value **rotates** on every refresh through the metrics
+(MRR → ARR → Subscribers → ARPA → LTV → Lifetime → this month's net movement), with
+a ▲/▼ trend (last 30 days). The dropdown always shows **everything**:
 
-- MRR, ARR (Run Rate), Paid Subscribers, ARPA, Customer LTV — jeweils mit 30-Tage-Änderung
-- Ø Kundenlebensdauer (abgeleitet aus LTV ÷ ARPA)
-- MRR-Movement des laufenden Monats (New Business, Expansion, Contraction, Churn,
-  Reactivation, Net)
+- MRR, ARR (Run Rate), Paid Subscribers, ARPA, Customer LTV — each with its 30-day change
+- Average customer lifetime (derived from LTV ÷ ARPA)
+- This month's MRR movement (New Business, Expansion, Contraction, Churn, Reactivation, Net)
 
-Die Werte stammen aus den ChartMogul-Metrics-Endpoints (`/v1/metrics/mrr`, `/arr`,
-`/customer-count`, `/arpa`, `/ltv`). Daten werden 10 Min gecacht, damit schnelle Rotation
-kaum API-Calls kostet.
+Values come from the ChartMogul Metrics endpoints (`/v1/metrics/mrr`, `/arr`,
+`/customer-count`, `/arpa`, `/ltv`). Data is cached for 10 minutes so fast rotation
+barely costs any API calls.
 
-## Voraussetzungen
-- macOS mit `python3` (nur Standardbibliothek)
-- ChartMogul-API-Key: **Admin → API Keys**
+## Requirements
+- macOS with `python3` (standard library only)
+- A ChartMogul API key: **Admin → API Keys**
 
 ## Installation
 
-1. **SwiftBar installieren**
+1. **Install SwiftBar**
    ```sh
    brew install --cask swiftbar
    ```
-   Beim ersten Start einen **Plugin-Ordner** wählen, z. B. `~/SwiftBar-Plugins`.
+   On first launch, pick a **plugins folder**, e.g. `~/SwiftBar-Plugins`.
 
-2. **API-Key ablegen**
+2. **Store the API key**
    ```sh
    mkdir -p ~/.config/revenue-stats-bar
-   printf '%s' 'DEIN_CHARTMOGUL_API_KEY' > ~/.config/revenue-stats-bar/token
+   printf '%s' 'YOUR_CHARTMOGUL_API_KEY' > ~/.config/revenue-stats-bar/token
    chmod 600 ~/.config/revenue-stats-bar/token
    ```
-   Alternativ: Umgebungsvariable `CHARTMOGUL_API_KEY` setzen.
+   Alternatively, set the `CHARTMOGUL_API_KEY` environment variable.
 
-3. **Plugin verlinken** (Repo bleibt Quelle der Wahrheit):
+3. **Symlink the plugin** (the repo stays the source of truth):
    ```sh
    chmod +x revenue.1m.py
    ln -s "$(pwd)/revenue.1m.py" ~/SwiftBar-Plugins/revenue.1m.py
    ```
 
-4. In SwiftBar **„Refresh all"** auslösen.
+4. Trigger **"Refresh all"** in SwiftBar.
 
-## Anpassen (oben in `revenue.1m.py`)
-- **Rotations-Tempo:** Zahl im Dateinamen, z. B. `revenue.2m.py` = alle 2 Min weiterschalten.
-- **Welche Kennzahlen rotieren:** Liste `ROTATION` (Eintrag entfernen = nicht mehr in der Bar).
-- **Rotation aus:** `ROTATE = False` → zeigt fix die erste Kennzahl aus `ROTATION`.
-- **Cache-Dauer:** `DATA_TTL_SECONDS` (Default 600 = 10 Min).
-- **Währungssymbol:** `CURRENCY_SYMBOL` (Default `€`).
+## Configuration (top of `revenue.1m.py`)
+- **Rotation speed:** the number in the filename, e.g. `revenue.2m.py` = advance every 2 minutes.
+- **Which metrics rotate:** the `ROTATION` list (remove an entry to drop it from the bar).
+- **Disable rotation:** `ROTATE = False` shows the first metric in `ROTATION`.
+- **Cache duration:** `DATA_TTL_SECONDS` (default 600 = 10 minutes).
+- **Currency symbol:** `CURRENCY_SYMBOL` (default `€`).
 
-## Schnelltest ohne SwiftBar
+## Quick test without SwiftBar
 ```sh
-CHARTMOGUL_API_KEY='DEIN_KEY' python3 revenue.1m.py
+CHARTMOGUL_API_KEY='YOUR_KEY' python3 revenue.1m.py
 ```
-Mehrfach ausführen → die erste Zeile rotiert durch die Kennzahlen.
-Ohne/mit falschem Key zeigt das Plugin `⚠︎ …` statt eines Tracebacks.
+Run it a few times — the first line rotates through the metrics.
+Without/with an invalid key it prints `⚠︎ …` instead of a traceback.
 
-## Dateien
-- `revenue.1m.py` — das SwiftBar-Plugin
-- `config.example` — Vorlage für die Token-Datei
+## Files
+- `revenue.1m.py` — the SwiftBar plugin
+- `config.example` — template for the token file
 - `.gitignore`, `README.md`
-- Laufzeit-State: `~/.config/revenue-stats-bar/state.json` (Cache + Rotationsindex)
+- Runtime state: `~/.config/revenue-stats-bar/state.json` (cache + rotation index)

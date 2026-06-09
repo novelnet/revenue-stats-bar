@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # <xbar.title>ChartMogul Revenue</xbar.title>
-# <xbar.version>v2.1</xbar.version>
+# <xbar.version>v2.2</xbar.version>
 # <xbar.author>Tobias Brauchle</xbar.author>
-# <xbar.desc>Rotiert MRR / ARR / Subscribers / ARPA / Netto-Movement in der Menüleiste; volles ChartMogul-Bild im Dropdown.</xbar.desc>
+# <xbar.desc>Rotates MRR / ARR / Subscribers / ARPA / LTV / Lifetime / net movement in the menu bar; full breakdown in the dropdown.</xbar.desc>
 # <xbar.dependencies>python3</xbar.dependencies>
 # <xbar.abouturl>https://dev.chartmogul.com/reference/metrics</xbar.abouturl>
 #
 # Setup:
-#   1) API-Key ablegen unter ~/.config/revenue-stats-bar/token (chmod 600)
-#      ODER Umgebungsvariable CHARTMOGUL_API_KEY setzen.
-#   2) chmod +x und in den SwiftBar-Plugins-Ordner verlinken.
+#   1) Store the API key in ~/.config/revenue-stats-bar/token (chmod 600)
+#      OR set the CHARTMOGUL_API_KEY environment variable.
+#   2) chmod +x and symlink it into the SwiftBar plugins folder.
 #
-# Rotation: Die Menüleisten-Zahl wechselt bei jedem Refresh zur nächsten Kennzahl.
-# Das Refresh-/Rotations-Intervall steckt im Dateinamen: revenue.1m.py = jede Minute.
-# Umbenennen ändert es (revenue.2m.py, revenue.5m.py, ...). Die API-Daten werden
-# DATA_TTL_SECONDS lang gecacht, damit schnelle Rotation kaum API-Calls kostet.
+# Rotation: the menu-bar value advances to the next metric on every refresh.
+# The refresh/rotation interval is the number in the filename: revenue.1m.py = every minute.
+# Rename to change it (revenue.2m.py, revenue.5m.py, ...). API data is cached for
+# DATA_TTL_SECONDS so fast rotation barely costs any API calls.
 
 import base64
 import json
@@ -25,19 +25,22 @@ import urllib.parse
 import urllib.request
 from datetime import date, datetime
 
-# --- Konfiguration -----------------------------------------------------------
+# --- Configuration -----------------------------------------------------------
 CURRENCY_SYMBOL = "€"
 API_ROOT = "https://api.chartmogul.com/v1/metrics"
 CONFIG_DIR = os.path.expanduser("~/.config/revenue-stats-bar")
 TOKEN_FILE = os.path.join(CONFIG_DIR, "token")
 STATE_FILE = os.path.join(CONFIG_DIR, "state.json")
 TIMEOUT = 10
-DATA_TTL_SECONDS = 600  # Daten so lange cachen (10 Min), nur Anzeige rotiert schneller
+DATA_TTL_SECONDS = 600  # cache data this long (10 min); only the display rotates faster
 
-# Reihenfolge der Rotation in der Menüleiste. Eintrag hier raus = nicht mehr in der Bar.
+# Order of the menu-bar rotation. Remove an entry to drop it from the bar.
 ROTATION = ["mrr", "arr", "subscribers", "arpa", "ltv", "lifetime", "net"]
-# ROTATE = False -> immer die erste Kennzahl aus ROTATION anzeigen (keine Rotation).
+# ROTATE = False -> always show the first metric in ROTATION (no rotation).
 ROTATE = True
+
+MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July",
+             "August", "September", "October", "November", "December"]
 
 
 # --- HTTP --------------------------------------------------------------------
@@ -64,13 +67,13 @@ def api_get(api_key, path, params):
 
 
 def fetch_all(api_key):
-    """Alle Kennzahlen holen und in eine flache Struktur bringen."""
+    """Fetch every metric and flatten it into one structure."""
     today = date.today().isoformat()
     month_start = date.today().replace(day=1).isoformat()
     day = {"start-date": today, "end-date": today, "interval": "day"}
 
     data = {}
-    # Bestandsgrößen mit 30-Tage-Änderung (summary.percentage-change matcht das Dashboard)
+    # Stock metrics with their 30-day change (summary.percentage-change matches the dashboard)
     for key, path in (("mrr", "/mrr"), ("arr", "/arr"),
                       ("subscribers", "/customer-count"), ("arpa", "/arpa"),
                       ("ltv", "/ltv")):
@@ -80,7 +83,7 @@ def fetch_all(api_key):
             "pct": summary.get("percentage-change", 0.0),
         }
 
-    # Monats-MRR-Movement (Monat bis heute)
+    # This month's MRR movement (month to date)
     month = api_get(api_key, "/mrr", {
         "start-date": month_start, "end-date": today, "interval": "month",
     })
@@ -95,14 +98,14 @@ def fetch_all(api_key):
         "new": nb, "expansion": ex, "contraction": co,
         "churn": ch, "reactivation": re, "net": nb + ex + co + ch + re,
     }
-    # Ø Kundenlebensdauer (Monate) = LTV / ARPA — die Beziehung, aus der ChartMogul den LTV bildet
+    # Avg. customer lifetime (months) = LTV / ARPA — the relation ChartMogul derives LTV from
     arpa_c = data["arpa"]["current"] or 0
     data["lifetime"] = {"months": (data["ltv"]["current"] / arpa_c) if arpa_c else 0}
     data["fetched_at"] = time.time()
     return data
 
 
-# --- State / Cache -----------------------------------------------------------
+# --- State / cache -----------------------------------------------------------
 def load_state():
     try:
         with open(STATE_FILE) as fh:
@@ -120,53 +123,47 @@ def save_state(state):
         pass
 
 
-# --- Formatierung ------------------------------------------------------------
+# --- Formatting (English / ChartMogul-style: € prefix, comma thousands) -------
 def fmt_eur(cents, sign=False):
     value = cents / 100.0
     s = ""
     if sign:
-        s = "+" if value > 0 else ("−" if value < 0 else "")
+        s = "+" if value > 0 else ("-" if value < 0 else "")
         value = abs(value)
-    body = f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"{s}{body} {CURRENCY_SYMBOL}"
+    return f"{s}{CURRENCY_SYMBOL}{value:,.2f}"
 
 
 def fmt_eur_short(cents):
-    """Kompakt für die Menüleiste, ohne Nachkommastellen."""
-    value = round(cents / 100.0)
-    body = f"{value:,.0f}".replace(",", ".")
-    return f"{body} {CURRENCY_SYMBOL}"
+    """Compact for the menu bar, no decimals."""
+    return f"{CURRENCY_SYMBOL}{round(cents / 100.0):,.0f}"
 
 
 def fmt_pct(pct):
-    return f"{pct:+.2f}%".replace(".", ",")
+    return f"{pct:+.2f}%"
 
 
 def fmt_lifetime(months, long=False):
     if not long:
-        return f"{round(months)} Mon."
-    years = months / 12.0
-    y = f"{years:.1f}".replace(".", ",")
-    return f"{round(months)} Monate (≈ {y} Jahre)"
+        return f"{round(months)} mo"
+    return f"{round(months)} months (≈ {months / 12:.1f} years)"
 
 
-# Definition jeder Kennzahl: (label, sfimage, bar-text-funktion)
+# Definition of each metric: (label, sfimage, bar text, pct or None)
 def bar_metric(key, data):
     if key == "mrr":
         return "MRR", "chart.line.uptrend.xyaxis", fmt_eur_short(data["mrr"]["current"]), data["mrr"]["pct"]
     if key == "arr":
         return "ARR", "calendar", fmt_eur_short(data["arr"]["current"]), data["arr"]["pct"]
     if key == "subscribers":
-        return "Abos", "person.2.fill", str(data["subscribers"]["current"]), data["subscribers"]["pct"]
+        return "Subs", "person.2.fill", str(data["subscribers"]["current"]), data["subscribers"]["pct"]
     if key == "arpa":
         return "ARPA", "eurosign.circle", fmt_eur(data["arpa"]["current"]), data["arpa"]["pct"]
     if key == "ltv":
         return "LTV", "heart.circle", fmt_eur(data["ltv"]["current"]), data["ltv"]["pct"]
     if key == "lifetime":
-        return "Ø Dauer", "clock", fmt_lifetime(data["lifetime"]["months"]), None
+        return "Lifetime", "clock", fmt_lifetime(data["lifetime"]["months"]), None
     if key == "net":
-        net = data["month"]["net"]
-        return "Netto/M", "arrow.up.arrow.down", fmt_eur(net, sign=True), None
+        return "Net/mo", "arrow.up.arrow.down", fmt_eur(data["month"]["net"], sign=True), None
     return key, "questionmark", "?", None
 
 
@@ -175,18 +172,18 @@ def emit_error(headline, *detail_lines):
     print("---")
     for line in detail_lines:
         print(line)
-    print(f"Stand: {datetime.now():%H:%M}")
-    print("Refresh | refresh=true")
+    print(f"Updated {datetime.now():%H:%M}")
+    print("Refresh now | refresh=true")
 
 
-# --- Hauptlogik --------------------------------------------------------------
+# --- Main --------------------------------------------------------------------
 def main():
     api_key = load_api_key()
     if not api_key:
-        emit_error("Kein API-Key",
-                   "Key ablegen unter:",
+        emit_error("No API key",
+                   "Add your key to:",
                    f"{TOKEN_FILE} | font=Menlo size=11",
-                   "oder CHARTMOGUL_API_KEY setzen. | size=11")
+                   "or set CHARTMOGUL_API_KEY. | size=11")
         return
 
     state = load_state()
@@ -198,46 +195,44 @@ def main():
             data = fetch_all(api_key)
             state["data"] = data
         except urllib.error.HTTPError as exc:
-            if data is None:  # kein Cache als Fallback
-                msg = "Ungültiger API-Key" if exc.code in (401, 403) else f"HTTP {exc.code}"
+            if data is None:  # no cache to fall back on
+                msg = "Invalid API key" if exc.code in (401, 403) else f"HTTP {exc.code}"
                 emit_error("ChartMogul", f"{msg} | color=red")
                 return
         except (urllib.error.URLError, TimeoutError, ValueError) as exc:
             if data is None:
-                emit_error("ChartMogul", f"Verbindungsfehler | color=red", f"{exc} | size=11")
+                emit_error("ChartMogul", "Connection error | color=red", f"{exc} | size=11")
                 return
 
-    # Rotationsindex bestimmen und weiterschalten
+    # Pick the rotation index and advance it
     idx = state.get("idx", 0) if ROTATE else 0
     key = ROTATION[idx % len(ROTATION)]
     if ROTATE:
         state["idx"] = (idx + 1) % len(ROTATION)
     save_state(state)
 
-    # --- Menüleisten-Zeile (rotierend) ---
-    # Keine Textfarbe in der Menüleiste: System-Farbe bleibt in Light/Dark immer lesbar.
-    # Trend stattdessen als ▲/▼ (bei abgeleiteten Werten ohne %-Trend kein Pfeil).
+    # --- Menu-bar line (rotating) ---
+    # No text color in the menu bar: the system color stays readable in light & dark.
+    # Trend is shown with an arrow instead (no arrow for derived values without a % trend).
     label, sfimage, value, pct = bar_metric(key, data)
     trend = ""
     if pct is not None and pct != 0:
         trend = " ▲" if pct > 0 else " ▼"
     print(f"{label} {value}{trend} | sfimage={sfimage}")
 
-    # --- Dropdown: immer das volle Bild ---
+    # --- Dropdown: always the full picture ---
     print("---")
-    print("Kennzahlen (Δ = letzte 30 Tage) | size=11 color=gray")
+    print("Metrics (Δ = last 30 days) | size=11 color=gray")
     print(f"MRR: {fmt_eur(data['mrr']['current'])}  ({fmt_pct(data['mrr']['pct'])}) | sfimage=chart.line.uptrend.xyaxis")
     print(f"ARR (Run Rate): {fmt_eur(data['arr']['current'])}  ({fmt_pct(data['arr']['pct'])}) | sfimage=calendar")
     print(f"Paid Subscribers: {data['subscribers']['current']}  ({fmt_pct(data['subscribers']['pct'])}) | sfimage=person.2.fill")
     print(f"ARPA: {fmt_eur(data['arpa']['current'])}  ({fmt_pct(data['arpa']['pct'])}) | sfimage=eurosign.circle")
     print(f"Customer LTV: {fmt_eur(data['ltv']['current'])}  ({fmt_pct(data['ltv']['pct'])}) | sfimage=heart.circle")
-    print(f"Ø Kundenlebensdauer: {fmt_lifetime(data['lifetime']['months'], long=True)} | sfimage=clock")
+    print(f"Avg. Customer Lifetime: {fmt_lifetime(data['lifetime']['months'], long=True)} | sfimage=clock")
 
     m = data["month"]
-    months_de = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
-                 "August", "September", "Oktober", "November", "Dezember"]
     print("---")
-    print(f"Diesen Monat ({months_de[date.today().month - 1]}) | size=11 color=gray")
+    print(f"This Month ({MONTHS_EN[date.today().month - 1]}) | size=11 color=gray")
     print(f"New Business: {fmt_eur(m['new'], sign=True)}")
     print(f"Expansion: {fmt_eur(m['expansion'], sign=True)}")
     print(f"Contraction: {fmt_eur(m['contraction'], sign=True)}")
@@ -247,9 +242,9 @@ def main():
 
     print("---")
     age = int(time.time() - data.get("fetched_at", time.time()))
-    print(f"Daten {age//60}m alt · {datetime.now():%H:%M} | size=11 color=gray")
-    print("Jetzt aktualisieren | refresh=true")
-    print("Zu ChartMogul ↗ | href=https://app.chartmogul.com")
+    print(f"Updated {datetime.now():%H:%M} · data {age // 60}m old | size=11 color=gray")
+    print("Refresh now | refresh=true")
+    print("Open ChartMogul ↗ | href=https://app.chartmogul.com")
 
 
 if __name__ == "__main__":
