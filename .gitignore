@@ -1,0 +1,10 @@
+# Niemals echte Secrets committen
+token
+*.token
+.env
+
+# Editor / OS / Python
+.idea/
+.DS_Store
+__pycache__/
+*.pyc
