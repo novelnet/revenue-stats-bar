@@ -35,7 +35,7 @@ TIMEOUT = 10
 DATA_TTL_SECONDS = 600  # Daten so lange cachen (10 Min), nur Anzeige rotiert schneller
 
 # Reihenfolge der Rotation in der Menüleiste. Eintrag hier raus = nicht mehr in der Bar.
-ROTATION = ["mrr", "arr", "subscribers", "arpa", "ltv", "net"]
+ROTATION = ["mrr", "arr", "subscribers", "arpa", "ltv", "lifetime", "net"]
 # ROTATE = False -> immer die erste Kennzahl aus ROTATION anzeigen (keine Rotation).
 ROTATE = True
 
@@ -95,6 +95,9 @@ def fetch_all(api_key):
         "new": nb, "expansion": ex, "contraction": co,
         "churn": ch, "reactivation": re, "net": nb + ex + co + ch + re,
     }
+    # Ø Kundenlebensdauer (Monate) = LTV / ARPA — die Beziehung, aus der ChartMogul den LTV bildet
+    arpa_c = data["arpa"]["current"] or 0
+    data["lifetime"] = {"months": (data["ltv"]["current"] / arpa_c) if arpa_c else 0}
     data["fetched_at"] = time.time()
     return data
 
@@ -139,6 +142,14 @@ def fmt_pct(pct):
     return f"{pct:+.2f}%".replace(".", ",")
 
 
+def fmt_lifetime(months, long=False):
+    if not long:
+        return f"{round(months)} Mon."
+    years = months / 12.0
+    y = f"{years:.1f}".replace(".", ",")
+    return f"{round(months)} Monate (≈ {y} Jahre)"
+
+
 # Definition jeder Kennzahl: (label, sfimage, bar-text-funktion)
 def bar_metric(key, data):
     if key == "mrr":
@@ -151,6 +162,8 @@ def bar_metric(key, data):
         return "ARPA", "eurosign.circle", fmt_eur(data["arpa"]["current"]), data["arpa"]["pct"]
     if key == "ltv":
         return "LTV", "heart.circle", fmt_eur(data["ltv"]["current"]), data["ltv"]["pct"]
+    if key == "lifetime":
+        return "Ø Dauer", "clock", fmt_lifetime(data["lifetime"]["months"]), None
     if key == "net":
         net = data["month"]["net"]
         return "Netto/M", "arrow.up.arrow.down", fmt_eur(net, sign=True), None
@@ -202,11 +215,13 @@ def main():
     save_state(state)
 
     # --- Menüleisten-Zeile (rotierend) ---
+    # Keine Textfarbe in der Menüleiste: System-Farbe bleibt in Light/Dark immer lesbar.
+    # Trend stattdessen als ▲/▼ (bei abgeleiteten Werten ohne %-Trend kein Pfeil).
     label, sfimage, value, pct = bar_metric(key, data)
-    color = ""
-    if pct is not None:
-        color = " color=#37b24d" if pct >= 0 else " color=#f03e3e"
-    print(f"{label} {value} | sfimage={sfimage}{color}")
+    trend = ""
+    if pct is not None and pct != 0:
+        trend = " ▲" if pct > 0 else " ▼"
+    print(f"{label} {value}{trend} | sfimage={sfimage}")
 
     # --- Dropdown: immer das volle Bild ---
     print("---")
@@ -216,6 +231,7 @@ def main():
     print(f"Paid Subscribers: {data['subscribers']['current']}  ({fmt_pct(data['subscribers']['pct'])}) | sfimage=person.2.fill")
     print(f"ARPA: {fmt_eur(data['arpa']['current'])}  ({fmt_pct(data['arpa']['pct'])}) | sfimage=eurosign.circle")
     print(f"Customer LTV: {fmt_eur(data['ltv']['current'])}  ({fmt_pct(data['ltv']['pct'])}) | sfimage=heart.circle")
+    print(f"Ø Kundenlebensdauer: {fmt_lifetime(data['lifetime']['months'], long=True)} | sfimage=clock")
 
     m = data["month"]
     months_de = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
