@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # <xbar.title>ChartMogul Revenue</xbar.title>
-# <xbar.version>v2.0</xbar.version>
+# <xbar.version>v2.1</xbar.version>
 # <xbar.author>Tobias Brauchle</xbar.author>
 # <xbar.desc>Rotiert MRR / ARR / Subscribers / ARPA / Netto-Movement in der Menüleiste; volles ChartMogul-Bild im Dropdown.</xbar.desc>
 # <xbar.dependencies>python3</xbar.dependencies>
@@ -35,7 +35,7 @@ TIMEOUT = 10
 DATA_TTL_SECONDS = 600  # Daten so lange cachen (10 Min), nur Anzeige rotiert schneller
 
 # Reihenfolge der Rotation in der Menüleiste. Eintrag hier raus = nicht mehr in der Bar.
-ROTATION = ["mrr", "arr", "subscribers", "arpa", "net"]
+ROTATION = ["mrr", "arr", "subscribers", "arpa", "ltv", "net"]
 # ROTATE = False -> immer die erste Kennzahl aus ROTATION anzeigen (keine Rotation).
 ROTATE = True
 
@@ -72,7 +72,8 @@ def fetch_all(api_key):
     data = {}
     # Bestandsgrößen mit 30-Tage-Änderung (summary.percentage-change matcht das Dashboard)
     for key, path in (("mrr", "/mrr"), ("arr", "/arr"),
-                      ("subscribers", "/customer-count"), ("arpa", "/arpa")):
+                      ("subscribers", "/customer-count"), ("arpa", "/arpa"),
+                      ("ltv", "/ltv")):
         summary = api_get(api_key, path, day).get("summary", {})
         data[key] = {
             "current": summary.get("current", 0),
@@ -148,6 +149,8 @@ def bar_metric(key, data):
         return "Abos", "person.2.fill", str(data["subscribers"]["current"]), data["subscribers"]["pct"]
     if key == "arpa":
         return "ARPA", "eurosign.circle", fmt_eur(data["arpa"]["current"]), data["arpa"]["pct"]
+    if key == "ltv":
+        return "LTV", "heart.circle", fmt_eur(data["ltv"]["current"]), data["ltv"]["pct"]
     if key == "net":
         net = data["month"]["net"]
         return "Netto/M", "arrow.up.arrow.down", fmt_eur(net, sign=True), None
@@ -212,6 +215,7 @@ def main():
     print(f"ARR (Run Rate): {fmt_eur(data['arr']['current'])}  ({fmt_pct(data['arr']['pct'])}) | sfimage=calendar")
     print(f"Paid Subscribers: {data['subscribers']['current']}  ({fmt_pct(data['subscribers']['pct'])}) | sfimage=person.2.fill")
     print(f"ARPA: {fmt_eur(data['arpa']['current'])}  ({fmt_pct(data['arpa']['pct'])}) | sfimage=eurosign.circle")
+    print(f"Customer LTV: {fmt_eur(data['ltv']['current'])}  ({fmt_pct(data['ltv']['pct'])}) | sfimage=heart.circle")
 
     m = data["month"]
     months_de = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",

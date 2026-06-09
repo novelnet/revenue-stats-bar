@@ -4,15 +4,15 @@ Zeigt deine wichtigsten **ChartMogul-Kennzahlen** in der macOS-Menüleiste über
 [SwiftBar](https://github.com/swiftbar/SwiftBar).
 
 Die Menüleisten-Zahl **rotiert** bei jedem Refresh durch die Kennzahlen
-(MRR → ARR → Subscribers → ARPA → Netto-Movement diesen Monat), grün/rot je nach
-30-Tage-Trend. Das Aufklapp-Menü zeigt immer **alles**:
+(MRR → ARR → Subscribers → ARPA → LTV → Netto-Movement diesen Monat), grün/rot je
+nach 30-Tage-Trend. Das Aufklapp-Menü zeigt immer **alles**:
 
-- MRR, ARR (Run Rate), Paid Subscribers, ARPA — jeweils mit 30-Tage-Änderung
+- MRR, ARR (Run Rate), Paid Subscribers, ARPA, Customer LTV — jeweils mit 30-Tage-Änderung
 - MRR-Movement des laufenden Monats (New Business, Expansion, Contraction, Churn,
   Reactivation, Net)
 
 Die Werte stammen aus den ChartMogul-Metrics-Endpoints (`/v1/metrics/mrr`, `/arr`,
-`/customer-count`, `/arpa`). Daten werden 10 Min gecacht, damit schnelle Rotation
+`/customer-count`, `/arpa`, `/ltv`). Daten werden 10 Min gecacht, damit schnelle Rotation
 kaum API-Calls kostet.
 
 ## Voraussetzungen
