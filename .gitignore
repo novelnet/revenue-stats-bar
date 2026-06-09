@@ -1,4 +1,4 @@
-# Niemals echte Secrets committen
+# Never commit real secrets
 token
 *.token
 .env
